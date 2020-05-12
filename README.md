@@ -4,11 +4,11 @@ Measure heart rate and skin temperature to track hot flush occurence and severit
 
 ## Getting Started
 
-These instructions are designed to get the code working with PlatformIO. The code will work with the Arduino IDE, but it is easier with PlatformIO, which is cross-platform and free.
+The code will work with the Arduino IDE, but it is easier with PlatformIO, which is cross-platform and free. See instructions below.
 
 ### Prerequisites
 
-Hardware:
+#### Hardware
 * Arduino Uno
 * [Wave Shield](https://www.adafruit.com/product/94), or any SD card shield ([example](https://www.adafruit.com/product/1141))
 * [MAX3010x Heart Rate Sensor Breakout](http://sfe.io/p14045) (x = 2 or 5)
@@ -20,11 +20,11 @@ Hardware:
 ![Fritzing schematic](schematic.png "Schematic")
 If you use another shield and don't have a switch, just connect a hookup wire from pin 7 to ground to keep the code running.
 
-Software:
+#### Software
 * PlatformIO (preferred) or
 * Arduino IDE
 
-Libraries:
+#### Libraries
 * [SparkFun MAX3010x Pulse and Proximity Library](https://github.com/sparkfun/SparkFun_MAX3010x_Sensor_Library)
 * [Adafruit MCP9808 Library](https://github.com/adafruit/Adafruit_MCP9808_Library)
 * [PetitFS](https://github.com/greiman/PetitFS) (by Bill Greiman)
