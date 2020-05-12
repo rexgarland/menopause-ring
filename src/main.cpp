@@ -1,6 +1,8 @@
 #ifndef UNIT_TEST
 
+#ifdef USING_PLATFORMIO
 #include <Arduino.h>
+#endif
 #include <String.h>
 #ifndef NOHR
 #include "MAX30105.h"
@@ -20,6 +22,8 @@
 #include "PetitFS.h"
 #include "PetitSerial.h"
 #endif
+
+#define SWITCH PIND7
 
 #define SAMPLERATE 400
 
@@ -107,7 +111,7 @@ void stopPulseSensor() {
 // Switch declarations
 
 int onSwitch() {
-  return !digitalRead(PIND7);
+  return !digitalRead(SWITCH);
 }
 
 #ifndef NOHR
@@ -307,6 +311,7 @@ void setup(void) {
   while (!Serial);
   Serial.println("# Serial started...");
   #endif
+  pinMode(SWITCH,INPUT_PULLUP);
   initPeriphs();
   #ifdef DEBUG
   Serial.println("# Starting program...");
