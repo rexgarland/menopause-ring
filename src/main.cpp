@@ -1,5 +1,10 @@
+// main.cpp
+//
+// Runs a loop to measure heart rate and temperature for data logging and e-paper display.
+
 #ifndef UNIT_TEST
 
+// Use preprocessor directives to turn on and off various functions.
 #ifdef USING_PLATFORMIO
 #include <Arduino.h>
 #endif
@@ -20,26 +25,35 @@
 #include <SPI.h>
 #ifndef NOSD
 #include "PetitFS.h"
-#include "PetitSerial.h"
 #endif
 
-#define SWITCH PIND7
-
-#define SAMPLERATE 400
+// ----------- State Variables -----------
 
 enum State { idle, processing, beat, display };
 State state = idle; // program state
+struct stateData {
+  float hr;
+  float temp;
+} sdata;
 
+// ----------- Manual Switch -----------
 
-// Temperature
+// wire this pin to GND if you want to keep the main loop running
+#define SWITCH PIND7
+
+int onSwitch() {
+  return !digitalRead(SWITCH);
+}
+
+// ----------- Temperature Sensor -----------
+
 #ifndef NOTEMP
 Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 #endif
 
-
 #ifndef NOEPD
 
-// EPD
+// ----------- e-Paper Display -----------
 
 #define COLORED     0
 #define UNCOLORED   1
@@ -47,30 +61,30 @@ Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 unsigned char image[512];
 Paint paint(image, 0, 0);    // width should be the multiple of 8 
 Epd epd;
-#define offset_x1 200-32
-#define offset_x2 200-16
-#define offset_y 200-64
+#define offset_x 200-32
+#define offset_y1 200-64+16
+#define offset_y2 200-64
 
-void drawDisplay(float hr) {
-  // update display string
-  String s = String((int) hr);
-  char hrStr[3];
-  s.toCharArray(hrStr, 3);
-  // paint digits onto display frame
+void drawDisplay() {
+  int hrint = (int) sdata.hr;
+  char hr10 = '0'+hrint/10;
+  char hr1 = '0'+hrint%10;
   epd.SetFrameMemory(IMAGE_DATA);
+  // epd.ClearFrameMemory(0xFF);
   paint.Clear(UNCOLORED);
-  paint.DrawNumAt(3,10,hrStr[0],&Font20Num,COLORED);
-  epd.SetFrameMemory(paint.GetImage(), offset_x1, offset_y, paint.GetWidth(), paint.GetHeight());
+  char hrStr[2] = {hr10,'\0'};
+  paint.DrawNumStringAt(3,10,hrStr,&Font20Num,COLORED);
+  epd.SetFrameMemory(paint.GetImage(), offset_x, offset_y1, paint.GetWidth(), paint.GetHeight());
   paint.Clear(UNCOLORED);
-  paint.DrawNumAt(3,10,hrStr[1],&Font20Num,COLORED);
-  epd.SetFrameMemory(paint.GetImage(), offset_x2, offset_y, paint.GetWidth(), paint.GetHeight());
-  // push to display
+  hrStr[0] = hr1;
+  paint.DrawNumStringAt(3,10,hrStr,&Font20Num,COLORED);
+  epd.SetFrameMemory(paint.GetImage(), offset_x, offset_y2, paint.GetWidth(), paint.GetHeight());
   epd.DisplayFrame();
 }
 
 #endif
 
-// Pulse sensor declarations
+// ----------- Heart Rate Sensor -----------
 
 #ifndef NOHR
 
@@ -90,7 +104,7 @@ void startPulseSensor() {
   byte ledBrightness = 70; //Options: 0=Off to 255=50mA
   byte sampleAverage = 1; //Options: 1, 2, 4, 8, 16, 32
   byte ledMode = 3; //Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
-  int sampleRate = SAMPLERATE; //Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
+  int sampleRate = 400; //Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
   int pulseWidth = 69; //Options: 69, 118, 215, 411
   int adcRange = 16384; //Options: 2048, 4096, 8192, 16384
   particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange); //Configure sensor with these settings
@@ -106,115 +120,139 @@ void stopPulseSensor() {
   Serial.println("# MAX30105 stopped.");
   #endif
 }
-#endif
 
-// Switch declarations
-
-int onSwitch() {
-  return !digitalRead(SWITCH);
-}
-
-#ifndef NOHR
+#define SAMPLERATE 400
 BPMProcessor bpm(SAMPLERATE);
 int beatCount = 0;
+
 #endif
+
+// ----------- SD Card -----------
+
+#ifndef NOSD
 
 void errorHalt(const char * error) {
   Serial.println(error);
   while(1);
 }
 
-#ifndef NOSD
-// SD Card
 FATFS fs;
 const char * path = "TEST.TXT";
+UINT nr;
 
+// init file system
 void startSD() {
-  // initialize file system
   if (pf_mount(&fs)) errorHalt("pf_mount");
   if (pf_open("TEST.TXT")) errorHalt("pf_open");
   pf_lseek(0);
-  // if (sd.begin(chipSelect, SD_SCK_MHZ(50))) {
-  //   #ifdef DEBUG
-  //   Serial.println("# SD initialization successful.");
-  //   #endif
-  // } else {
-  //   #ifdef DEBUG
-  //   Serial.println("# SD initialization failed.");
-  //   #endif
-  //   while (1);
-  // }
 }
 
+// open file and write csv header
 void openFile() {
-  // open file
-  // file = sd.open(path, FILE_WRITE);
-  // if (file) {
-  //   #ifdef DEBUG
-  //   Serial.println("# File open successful.");
-  //   #endif
-  //   #ifdef NOTEMP
-  //   file.println("Time (us),Index,HR Signal,Latest Beat,Heart Rate (bpm)");
-  //   #else
-  //   file.println("Time (us),Index,HR Signal,Temperature (C),Latest Beat,Heart Rate (bpm)");
-  //   #endif
-  // } else {
-  //   #ifdef DEBUG
-  //   Serial.println("# File open failed.");
-  //   #endif
-  //   file.close();
-  //   while (1);
-  // }
-  pf_open("TEST.TXT");
+  int success = pf_open("TEST.TXT");
+   errorHalt("# File open failed.");
+  #ifdef DEBUG
+  if (!success) {
+    errorHalt("# File open failed.");
+  }
+  #endif
+  #ifdef NOTEMP
+  writeFile("Time (us),Index,HR Signal,Latest Beat,Heart Rate (bpm)\n");
+  #else
+  writeFile("Time (us),Index,HR Signal,Temperature (C),Latest Beat,Heart Rate (bpm)\n");
+  #endif
 }
 
+// helper functions to write to file
+
+void writeFile(char * buff) {
+  int i=0;
+  char c = buff[i];
+  while (c!='\0') {
+    pf_write(buff+i,1,&nr);
+    c = buff[++i];
+  }
+}
+
+void writeFile(float f) {
+  String s(f);
+  unsigned char buff[30];
+  s.getBytes(buff,s.length());
+  int i=0;
+  char c = buff[i];
+  while (c!='\0') {
+    pf_write(buff+i,1,&nr);
+    c = buff[++i];
+  }
+}
+
+void writeFile(long l) {
+  String s(l);
+  unsigned char buff[30];
+  s.getBytes(buff,s.length());
+  int i=0;
+  char c = buff[i];
+  while (c!='\0') {
+    pf_write(buff+i,1,&nr);
+    c = buff[++i];
+  }
+}
+
+void writeFile(unsigned long l) {
+  String s(l);
+  unsigned char buff[30];
+  s.getBytes(buff,s.length());
+  int i=0;
+  char c = buff[i];
+  while (c!='\0') {
+    pf_write(buff+i,1,&nr);
+    c = buff[++i];
+  }
+}
+
+// write one data line
 void writeData() {
-  // file.print(micros());
-  // file.print(",");
-  // #ifndef NOHR
-  // file.print(test_sampleCount(bpm));
-  // file.print(",");
-  // file.print(bpm.y);
-  // if (bpm.available()) {
-  //   #ifndef NOTEMP
-  //   file.print(",");
-  //   file.print(tempsensor.readTempC());
-  //   #endif
-  //   file.print(",");
-  //   file.print(test_lastBeat(bpm));
-  //   file.print(",");
-  //   file.print(bpm.getBPM());
-  // }
-  // #else
-  // #ifndef NOTEMP
-  // file.print(",");
-  // file.print(tempsensor.readTempC());
-  // #endif
-  // #endif
-  // file.println();
-  UINT nr;
-  char * buff[100];
-sdfsldkjf
-  pf_write(buf,10,&nr);
-  pf_write("\n",1,&nr);
+  writeFile(micros());
+  writeFile(",");
+  #ifndef NOHR
+  writeFile(test_sampleCount(bpm));
+  writeFile(",");
+  writeFile(bpm.y);
+  if (bpm.available()) {
+    #ifndef NOTEMP
+    writeFile(",");
+    writeFile(tempsensor.readTempC());
+    #endif
+    writeFile(",");
+    writeFile(test_lastBeat(bpm));
+    writeFile(",");
+    writeFile(bpm.getBPM());
+  }
+  #else
+  #ifndef NOTEMP
+  writeFile(",");
+  writeFile(tempsensor.readTempC());
+  #endif
+  #endif
+  writeFile("\n");
 }
 
 void closeFile() {
-  // close file
-  file.close();
-  #ifdef DEBUG
-  Serial.println("# File closed.");
-  #endif
+  // write out the end of the 512 byte block
+  pf_write(0,0,&nr);
 }
 
 #endif
 
+// ----------- Serial Debugging -----------
+
 #ifdef DEBUG
+
 void printOut() {
   #ifndef NOHR
   Serial.print(test_sampleCount(bpm));
-  Serial.print(",");
-  Serial.print(bpm.x);
+  // Serial.print(",");
+  // Serial.print(bpm.x);
   Serial.print(",");
   Serial.print(bpm.y);
   Serial.print(",");
@@ -228,15 +266,19 @@ void printOut() {
     Serial.print(bpm.minY);
     Serial.print(",");
     Serial.print(bpm.getBPM());
-    bpm.next();
   }
   #else
+  #ifndef NOTEMP
   Serial.print(tempsensor.readTempC());
+  #endif
   delay(2);
   #endif
   Serial.println();
 }
+
 #endif
+
+// ----------- State Functions -----------
 
 void initPeriphs() {
   #ifndef NOTEMP
@@ -273,8 +315,8 @@ void initPeriphs() {
   // epd.ClearFrameMemory(0xFF);   // bit set = white, bit reset = black
   // epd.DisplayFrame();
   paint.SetRotate(ROTATE_270);
-  paint.SetWidth(16);
-  paint.SetHeight(32);
+  paint.SetWidth(32);
+  paint.SetHeight(16);
   paint.Clear(UNCOLORED);
   
   #endif
@@ -318,7 +360,6 @@ void setup(void) {
   #endif
 }
 
-
 void loop(void) {
   switch (state) {
     case idle: {
@@ -361,10 +402,11 @@ void loop(void) {
         printOut();
         #endif
         particleSensor.nextSample();
-      }
-      if (bpm.available()) {
-        bpm.next();
-        state = beat;
+        if (bpm.available()) {
+          bpm.next();
+          state = beat;
+          break;
+        }
       }
       #else
       printOut();
@@ -378,13 +420,18 @@ void loop(void) {
       Serial.println(bpm.getBPM());
       #endif
       #endif
+      #ifndef NOTEMP
+      sdata.temp = 0.3*tempsensor.readTempC() + 0.7*sdata.temp; // low pass filter temp
+      #endif
       #ifndef NOHR
-      if (++beatCount>40) {
+      if (++beatCount>5) {
         #ifdef DEBUG
-        Serial.println("# 40 beats counted...");
+        Serial.println("# 5 beats counted...");
         #endif
         beatCount = 0;
         state = display;
+      } else {
+        state = processing;
       }
       #endif
       break;
@@ -392,9 +439,10 @@ void loop(void) {
     case display: {
       #ifndef NOEPD
       #ifdef DEBUG
-      Serial.print("Displaying... ");
+      Serial.print("# Displaying... ");
       #endif
-      drawDisplay(bpm.getBPM());
+      sdata.hr = bpm.getBPM();
+      drawDisplay();
       #endif
       #ifdef DEBUG
       Serial.println("# Collecting data...");

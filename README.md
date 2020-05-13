@@ -14,6 +14,7 @@ The code will work with the Arduino IDE, but it is easier with PlatformIO, which
 * [MAX3010x Heart Rate Sensor Breakout](http://sfe.io/p14045) (x = 2 or 5)
 * [MCP9808 Temperature Sensor Breakout](https://www.adafruit.com/product/1782)
 * [1.54" Waveshare e-Paper Display Module](https://www.waveshare.com/wiki/1.54inch_e-Paper_Module)
+* Rubber bands and a bandana (for mounting to your hand/finger)
 * Toggle switch (optional)
 * 2000 mAh 3.7V LiPo Battery (optional)
 
@@ -29,6 +30,7 @@ If you use another shield and don't have a switch, just connect a hookup wire fr
 * [Adafruit MCP9808 Library](https://github.com/adafruit/Adafruit_MCP9808_Library)
 * [PetitFS](https://github.com/greiman/PetitFS) (by Bill Greiman)
 * [e-Paper](https://github.com/waveshare/e-Paper) (by “Yehui from Waveshare”)
+
 (The e-Paper library has been modified to reduce RAM by displaying only numerical digits. The modified code is placed in the src/ folder.. no need to download separately.)
 
 ### Installing
