@@ -2,6 +2,8 @@
 
 Measure heart rate and skin temperature to track hot flush occurence and severity. This prototype uses a nifty e-paper display to show realtime data and sd card logging for later analysis.
 
+See the writeup on [hackster](https://www.hackster.io/rp/menopause-ring-ff1c09).
+
 ## Getting Started
 
 The code will work with the Arduino IDE, but it is easier with PlatformIO, which is cross-platform and free. See instructions below.
